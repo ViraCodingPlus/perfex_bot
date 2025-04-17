@@ -201,27 +201,35 @@ def handle_message(update: Update, context: CallbackContext) -> None:
         update.message.reply_text('لطفا یکی از گزینه‌های منو را انتخاب کنید.')
 
 def setup_bot():
-    """Setup the Telegram bot with handlers"""
-    # Create the Updater
-    updater = Updater(TOKEN)
-    
-    # Get the dispatcher to register handlers
+    """Setup the bot with all handlers"""
+    # Create updater
+    updater = Updater(TOKEN, use_context=True)
     dispatcher = updater.dispatcher
-    
-    # Add command handlers
+
+    # Add handlers
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("backup", backup_command))
-    dispatcher.add_handler(CommandHandler("sales", sales_report))
-    dispatcher.add_handler(CommandHandler("payments", payments_report))
-    dispatcher.add_handler(CommandHandler("invoices", invoices_report))
-    dispatcher.add_handler(CommandHandler("estimates", estimates_report))
-    dispatcher.add_handler(CommandHandler("proposals", proposals_report))
-    
-    # Add message handler
+    dispatcher.add_handler(MessageHandler(Filters.regex('^📊 گزارش فروش$'), sales_report))
+    dispatcher.add_handler(MessageHandler(Filters.regex('^💰 گزارش پرداخت‌ها$'), payments_report))
+    dispatcher.add_handler(MessageHandler(Filters.regex('^📝 گزارش فاکتورها$'), invoices_report))
+    dispatcher.add_handler(MessageHandler(Filters.regex('^📄 گزارش پیش فاکتورها$'), estimates_report))
+    dispatcher.add_handler(MessageHandler(Filters.regex('^📋 گزارش پروپوزال‌ها$'), proposals_report))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    
-    return updater, dispatcher
+
+    # Always use webhook if URL is provided
+    if WEBHOOK_URL:
+        updater.start_webhook(
+            listen='0.0.0.0',
+            port=int(os.getenv('PORT', 5000)),
+            url_path=TOKEN,
+            webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+        )
+    else:
+        logger.warning("WEBHOOK_URL not set. Bot will not start.")
+        return None
+
+    return updater
 
 def webhook(request):
     """Process webhook updates"""
@@ -240,10 +248,10 @@ def index():
 
 if __name__ == '__main__':
     # Setup bot
-    updater, dispatcher = setup_bot()
+    updater = setup_bot()
     
     # Store dispatcher in Flask app config
-    app.config['DISPATCHER'] = dispatcher
+    app.config['DISPATCHER'] = updater.dispatcher
     
     # Start the Bot in webhook mode
     if WEBHOOK_URL:
