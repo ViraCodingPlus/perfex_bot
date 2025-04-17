@@ -110,8 +110,9 @@ async def sales_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         report_file = get_sales_report()
         if report_file:
+            report_file.name = f"sales_report_{time.strftime('%Y%m%d-%H%M%S')}.xlsx"
             await update.message.reply_document(
-                document=open(report_file, 'rb'),
+                document=report_file,
                 caption='Sales report generated successfully!'
             )
         else:
@@ -129,8 +130,9 @@ async def payments_report(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         report_file = get_payments_report()
         if report_file:
+            report_file.name = f"payments_report_{time.strftime('%Y%m%d-%H%M%S')}.xlsx"
             await update.message.reply_document(
-                document=open(report_file, 'rb'),
+                document=report_file,
                 caption='Payments report generated successfully!'
             )
         else:
@@ -148,8 +150,9 @@ async def invoices_report(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         report_file = get_invoices_report()
         if report_file:
+            report_file.name = f"invoices_report_{time.strftime('%Y%m%d-%H%M%S')}.xlsx"
             await update.message.reply_document(
-                document=open(report_file, 'rb'),
+                document=report_file,
                 caption='Invoices report generated successfully!'
             )
         else:
@@ -167,8 +170,9 @@ async def estimates_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         report_file = get_estimates_report()
         if report_file:
+            report_file.name = f"estimates_report_{time.strftime('%Y%m%d-%H%M%S')}.xlsx"
             await update.message.reply_document(
-                document=open(report_file, 'rb'),
+                document=report_file,
                 caption='Estimates report generated successfully!'
             )
         else:
@@ -186,8 +190,9 @@ async def proposals_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         report_file = get_proposals_report()
         if report_file:
+            report_file.name = f"proposals_report_{time.strftime('%Y%m%d-%H%M%S')}.xlsx"
             await update.message.reply_document(
-                document=open(report_file, 'rb'),
+                document=report_file,
                 caption='Proposals report generated successfully!'
             )
         else:

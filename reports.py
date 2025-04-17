@@ -1,9 +1,9 @@
 import os
 import time
-import pandas as pd
-import matplotlib.pyplot as plt
-from database import execute_query, get_sqlalchemy_engine
+import xlsxwriter
+from database import execute_query
 from dotenv import load_dotenv
+from io import BytesIO
 
 # Load environment variables
 load_dotenv()
@@ -15,46 +15,54 @@ REPORTS_DIR = os.getenv('REPORTS_DIR', 'reports')
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 def generate_report_file(data, title, report_type):
-    """Generate a report file in Excel format with charts"""
-    timestamp = time.strftime('%Y%m%d-%H%M%S')
-    filename = os.path.join(REPORTS_DIR, f"{report_type}-{timestamp}.xlsx")
+    """Generate a report file in Excel format"""
+    # Create a BytesIO object to store the Excel file in memory
+    output = BytesIO()
     
-    # Create a Pandas Excel writer
-    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    # Create a workbook and add a worksheet
+    workbook = xlsxwriter.Workbook(output)
+    worksheet = workbook.add_worksheet('Report')
     
-    # Convert data to DataFrame
-    df = pd.DataFrame(data)
+    # Add a bold format for headers
+    bold = workbook.add_format({'bold': True})
     
-    # Write DataFrame to Excel
-    df.to_excel(writer, sheet_name='Report', index=False)
-    
-    # Access the XlsxWriter workbook and worksheet objects
-    workbook = writer.book
-    worksheet = writer.sheets['Report']
-    
-    # Create a chart object
-    if len(data) > 0 and 'total' in df.columns:
-        chart = workbook.add_chart({'type': 'column'})
+    # Write headers
+    if data:
+        headers = list(data[0].keys())
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, bold)
         
-        # Configure the series of the chart from the dataframe data
-        chart.add_series({
-            'name': 'Total',
-            'categories': ['Report', 1, 0, len(df), 0],
-            'values': ['Report', 1, df.columns.get_loc('total'), len(df), df.columns.get_loc('total')],
-        })
+        # Write data
+        for row, item in enumerate(data, start=1):
+            for col, key in enumerate(headers):
+                worksheet.write(row, col, item.get(key, ''))
         
-        # Configure the chart
-        chart.set_title({'name': title})
-        chart.set_x_axis({'name': 'Items'})
-        chart.set_y_axis({'name': 'Amount'})
-        
-        # Insert the chart into the worksheet
-        worksheet.insert_chart('H2', chart)
+        # Add a chart if there's a 'total' column
+        if 'total' in headers:
+            chart = workbook.add_chart({'type': 'column'})
+            
+            # Configure the series of the chart
+            chart.add_series({
+                'name': 'Total',
+                'categories': ['Report', 1, 0, len(data), 0],
+                'values': ['Report', 1, headers.index('total'), len(data), headers.index('total')],
+            })
+            
+            # Configure the chart
+            chart.set_title({'name': title})
+            chart.set_x_axis({'name': 'Items'})
+            chart.set_y_axis({'name': 'Amount'})
+            
+            # Insert the chart into the worksheet
+            worksheet.insert_chart('H2', chart)
     
-    # Save the Excel file
-    writer.save()
+    # Close the workbook
+    workbook.close()
     
-    return filename
+    # Reset the buffer position
+    output.seek(0)
+    
+    return output
 
 def get_sales_report():
     """Generate sales report from Perfex CRM database"""
