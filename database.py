@@ -1,6 +1,6 @@
 import os
 import time
-import subprocess
+import io
 import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
@@ -13,10 +13,6 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_NAME = os.getenv('DB_NAME')
-BACKUP_DIR = os.getenv('BACKUP_DIR', 'backups')
-
-# Ensure backup directory exists
-os.makedirs(BACKUP_DIR, exist_ok=True)
 
 def get_connection():
     """Create a connection to the database"""
@@ -32,43 +28,64 @@ def get_connection():
         raise Exception(f"Error connecting to MySQL database: {e}")
 
 def backup_database():
-    """Create a backup of the database"""
-    timestamp = time.strftime('%Y%m%d-%H%M%S')
-    backup_file = os.path.join(BACKUP_DIR, f"{DB_NAME}-{timestamp}.sql")
-    
-    # Check if we're on Windows
-    if os.name == 'nt':
-        # On Windows, use the mysqldump command in a slightly different way
-        cmd = [
-            'mysqldump',
-            f'--host={DB_HOST}',
-            f'--user={DB_USER}',
-            f'--password={DB_PASSWORD}',
-            DB_NAME,
-            f'--result-file={backup_file}'
-        ]
-    else:
-        # Unix-based systems
-        cmd = [
-            'mysqldump',
-            f'--host={DB_HOST}',
-            f'--user={DB_USER}',
-            f'--password={DB_PASSWORD}',
-            DB_NAME,
-            '>', 
-            backup_file
-        ]
-    
+    """Create a backup of the database in memory"""
     try:
-        # For Windows, we'll use subprocess directly
-        if os.name == 'nt':
-            subprocess.run(cmd, check=True)
-        else:
-            # For Unix, we'll use shell=True to properly handle the redirect
-            subprocess.run(' '.join(cmd), shell=True, check=True)
+        connection = get_connection()
+        cursor = connection.cursor()
+        
+        # Get all tables
+        cursor.execute("SHOW TABLES")
+        tables = [table[0] for table in cursor.fetchall()]
+        
+        # Create a string buffer to store the backup
+        backup_buffer = io.StringIO()
+        
+        # Write header
+        backup_buffer.write(f"-- Database backup of {DB_NAME}\n")
+        backup_buffer.write(f"-- Generated on {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        # Backup each table
+        for table in tables:
+            # Get table structure
+            cursor.execute(f"SHOW CREATE TABLE {table}")
+            create_table = cursor.fetchone()[1]
+            backup_buffer.write(f"{create_table};\n\n")
             
-        return backup_file
-    except subprocess.CalledProcessError as e:
+            # Get table data
+            cursor.execute(f"SELECT * FROM {table}")
+            rows = cursor.fetchall()
+            
+            if rows:
+                # Get column names
+                cursor.execute(f"SHOW COLUMNS FROM {table}")
+                columns = [column[0] for column in cursor.fetchall()]
+                
+                # Write INSERT statements
+                for row in rows:
+                    values = []
+                    for value in row:
+                        if value is None:
+                            values.append("NULL")
+                        elif isinstance(value, (int, float)):
+                            values.append(str(value))
+                        else:
+                            values.append(f"'{str(value).replace("'", "''")}'")
+                    
+                    insert = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join(values)});\n"
+                    backup_buffer.write(insert)
+                
+                backup_buffer.write("\n")
+        
+        # Close connections
+        cursor.close()
+        connection.close()
+        
+        # Convert string buffer to bytes
+        backup_data = backup_buffer.getvalue().encode('utf-8')
+        backup_buffer.close()
+        
+        return backup_data
+    except Exception as e:
         raise Exception(f"Database backup failed: {e}")
 
 def execute_query(query, params=None, fetch=True):

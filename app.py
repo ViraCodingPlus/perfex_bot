@@ -18,6 +18,8 @@ from reports import (
     get_estimates_report, 
     get_proposals_report
 )
+import time
+from io import BytesIO
 
 # Load environment variables
 load_dotenv()
@@ -83,10 +85,14 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     try:
-        backup_file = backup_database()
-        if backup_file:
+        backup_data = backup_database()
+        if backup_data:
+            # Create a temporary file in memory
+            backup_file = BytesIO(backup_data)
+            backup_file.name = f"{DB_NAME}-{time.strftime('%Y%m%d-%H%M%S')}.sql"
+            
             await update.message.reply_document(
-                document=open(backup_file, 'rb'),
+                document=backup_file,
                 caption='Database backup created successfully!'
             )
         else:
