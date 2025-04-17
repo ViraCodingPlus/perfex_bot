@@ -7,8 +7,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     filters,
-    ContextTypes,
-    Dispatcher
+    ContextTypes
 )
 from dotenv import load_dotenv
 from database import get_connection, backup_database
@@ -225,7 +224,7 @@ bot = setup_bot()
 async def process_webhook():
     """Process incoming webhook updates."""
     if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), bot)
+        update = Update.de_json(request.get_json(force=True), bot.bot)
         await bot.process_update(update)
     return "ok"
 
